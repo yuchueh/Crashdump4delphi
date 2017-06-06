@@ -1,0 +1,394 @@
+unit untDbgHlp;
+
+interface
+
+uses
+  Windows, SysUtils, Classes;
+
+const
+  THREAD_ALL_ACCESS = STANDARD_RIGHTS_REQUIRED or SYNCHRONIZE or $3FF;
+  {$EXTERNALSYM THREAD_ALL_ACCESS}
+
+const
+  MiniDumpNormal         = $0000;
+  {$EXTERNALSYM MiniDumpNormal}
+  MiniDumpWithDataSegs   = $0001;
+  {$EXTERNALSYM MiniDumpWithDataSegs}
+  MiniDumpWithFullMemory = $0002;
+  {$EXTERNALSYM MiniDumpWithFullMemory}
+  MiniDumpWithHandleData = $0004;
+  {$EXTERNALSYM MiniDumpWithHandleData}
+  MiniDumpFilterMemory   = $0008;
+  {$EXTERNALSYM MiniDumpFilterMemory}
+  MiniDumpScanMemory     = $0010;
+  {$EXTERNALSYM MiniDumpScanMemory}
+  MiniDumpWithUnloadedModules            = $0020;
+  {$EXTERNALSYM MiniDumpWithUnloadedModules}
+  MiniDumpWithIndirectlyReferencedMemory = $0040;
+  {$EXTERNALSYM MiniDumpWithIndirectlyReferencedMemory}
+  MiniDumpFilterModulePaths              = $0080;
+  {$EXTERNALSYM MiniDumpFilterModulePaths}
+  MiniDumpWithProcessThreadData          = $0100;
+  {$EXTERNALSYM MiniDumpWithProcessThreadData}
+  MiniDumpWithPrivateReadWriteMemory     = $0200;
+  {$EXTERNALSYM MiniDumpWithPrivateReadWriteMemory}
+  MiniDumpWithoutOptionalData             = $00000400;
+  {$EXTERNALSYM MiniDumpWithoutOptionalData}
+  MiniDumpWithFullMemoryInfo              = $00000800;
+  {$EXTERNALSYM MiniDumpWithFullMemoryInfo}
+  MiniDumpWithThreadInfo                  = $00001000;
+  {$EXTERNALSYM MiniDumpWithThreadInfo}
+  MiniDumpWithCodeSegs                    = $00002000;
+  {$EXTERNALSYM MiniDumpWithCodeSegs}
+  MiniDumpWithoutAuxiliaryState           = $00004000;
+  {$EXTERNALSYM MiniDumpWithoutAuxiliaryState}
+  MiniDumpWithFullAuxiliaryState          = $00008000;
+  {$EXTERNALSYM MiniDumpWithFullAuxiliaryState}
+  MiniDumpWithPrivateWriteCopyMemory      = $00010000;
+  {$EXTERNALSYM MiniDumpWithPrivateWriteCopyMemory}
+  MiniDumpIgnoreInaccessibleMemory        = $00020000;
+  {$EXTERNALSYM MiniDumpIgnoreInaccessibleMemory}
+  MiniDumpWithTokenInformation            = $00040000;
+  {$EXTERNALSYM MiniDumpWithTokenInformation}
+  MiniDumpWithModuleHeaders               = $00080000;
+  {$EXTERNALSYM MiniDumpWithModuleHeaders}
+  MiniDumpFilterTriage                    = $00100000;
+  {$EXTERNALSYM MiniDumpFilterTriage}
+  MiniDumpValidTypeFlags                  = $001fffff;
+  {$EXTERNALSYM MiniDumpValidTypeFlags}
+
+type
+
+//
+// Handle to an Object
+//
+
+  HANDLE = {$IFDEF USE_DELPHI_TYPES} Windows.THandle {$ELSE} Longword {$ENDIF};
+  {$EXTERNALSYM HANDLE}
+  PHANDLE = {$IFDEF USE_DELPHI_TYPES} Windows.PHandle {$ELSE} ^HANDLE {$ENDIF};
+  {$EXTERNALSYM PHANDLE}
+  THandle = {$IFDEF USE_DELPHI_TYPES} Windows.THandle {$ELSE} HANDLE {$ENDIF};
+
+  _MINIDUMP_TYPE = DWORD;
+  {$EXTERNALSYM _MINIDUMP_TYPE}
+  MINIDUMP_TYPE = _MINIDUMP_TYPE;
+  {$EXTERNALSYM MINIDUMP_TYPE}
+  TMinidumpType = MINIDUMP_TYPE;
+
+  PEXCEPTION_RECORD = ^EXCEPTION_RECORD;
+  {$EXTERNALSYM PEXCEPTION_RECORD}
+  _EXCEPTION_RECORD = record
+    ExceptionCode: DWORD;
+    ExceptionFlags: DWORD;
+    ExceptionRecord: PEXCEPTION_RECORD;
+    ExceptionAddress: Pointer;
+    NumberParameters: DWORD;
+    ExceptionInformation: array [0..EXCEPTION_MAXIMUM_PARAMETERS - 1] of ULONG_PTR;
+  end;
+  {$EXTERNALSYM _EXCEPTION_RECORD}
+  EXCEPTION_RECORD = _EXCEPTION_RECORD;
+  {$EXTERNALSYM EXCEPTION_RECORD}
+  TExceptionRecord = EXCEPTION_RECORD;
+  PExceptionRecord = PEXCEPTION_RECORD;
+
+//
+// Typedef for pointer returned by exception_info()
+//
+
+  PEXCEPTION_POINTERS = ^EXCEPTION_POINTERS;
+  {$EXTERNALSYM PEXCEPTION_POINTERS}
+  _EXCEPTION_POINTERS = record
+    ExceptionRecord: PEXCEPTION_RECORD;
+    ContextRecord: PCONTEXT;
+  end;
+  {$EXTERNALSYM _EXCEPTION_POINTERS}
+  EXCEPTION_POINTERS = _EXCEPTION_POINTERS;
+  {$EXTERNALSYM EXCEPTION_POINTERS}
+  TExceptionPointers = EXCEPTION_POINTERS;
+  PExceptionPointers = ^TExceptionPointers;
+
+  PACCESS_TOKEN = Pointer;
+  {$EXTERNALSYM PACCESS_TOKEN}
+
+//
+// Support for user supplied exception information.
+//
+
+  PMINIDUMP_EXCEPTION_INFORMATION = ^MINIDUMP_EXCEPTION_INFORMATION;
+  {$EXTERNALSYM PMINIDUMP_EXCEPTION_INFORMATION}
+  _MINIDUMP_EXCEPTION_INFORMATION = record
+    ThreadId: DWORD;
+    ExceptionPointers: PEXCEPTION_POINTERS;
+    ClientPointers: BOOL;
+  end;
+  {$EXTERNALSYM _MINIDUMP_EXCEPTION_INFORMATION}
+  MINIDUMP_EXCEPTION_INFORMATION = _MINIDUMP_EXCEPTION_INFORMATION;
+  {$EXTERNALSYM MINIDUMP_EXCEPTION_INFORMATION}
+  TMinidumpExceptionInformation = MINIDUMP_EXCEPTION_INFORMATION;
+  PMinidumpExceptionInformation = PMINIDUMP_EXCEPTION_INFORMATION;
+
+  RVA = DWORD;
+  {$EXTERNALSYM RVA}
+  RVA64 = ULONG64;
+  {$EXTERNALSYM RVA64}
+
+  _MINIDUMP_LOCATION_DESCRIPTOR = record
+    DataSize: ULONG32;
+    Rva: RVA;
+  end;
+  {$EXTERNALSYM _MINIDUMP_LOCATION_DESCRIPTOR}
+  MINIDUMP_LOCATION_DESCRIPTOR = _MINIDUMP_LOCATION_DESCRIPTOR;
+  {$EXTERNALSYM MINIDUMP_LOCATION_DESCRIPTOR}
+  TMinidumpLocationDescriptor = MINIDUMP_LOCATION_DESCRIPTOR;
+  PMinidumpLocationDescriptor = ^MINIDUMP_LOCATION_DESCRIPTOR;
+
+  _MINIDUMP_LOCATION_DESCRIPTOR64 = record
+    DataSize: ULONG64;
+    Rva: RVA64;
+  end;
+  {$EXTERNALSYM _MINIDUMP_LOCATION_DESCRIPTOR64}
+  MINIDUMP_LOCATION_DESCRIPTOR64 = _MINIDUMP_LOCATION_DESCRIPTOR64;
+  {$EXTERNALSYM MINIDUMP_LOCATION_DESCRIPTOR64}
+  TMinidumpLocationDescriptor64 = MINIDUMP_LOCATION_DESCRIPTOR64;
+  PMinidumpLocationDescriptor64 = ^MINIDUMP_LOCATION_DESCRIPTOR64;
+
+//
+// Callback support.
+//
+
+  _MINIDUMP_CALLBACK_TYPE = (
+    ModuleCallback,
+    ThreadCallback,
+    ThreadExCallback,
+    IncludeThreadCallback,
+    IncludeModuleCallback);
+  {$EXTERNALSYM _MINIDUMP_CALLBACK_TYPE}
+  MINIDUMP_CALLBACK_TYPE = _MINIDUMP_CALLBACK_TYPE;
+  {$EXTERNALSYM MINIDUMP_CALLBACK_TYPE}
+  TMinidumpCallbackType = MINIDUMP_CALLBACK_TYPE;
+
+  PMINIDUMP_THREAD_CALLBACK = ^MINIDUMP_THREAD_CALLBACK;
+  {$EXTERNALSYM PMINIDUMP_THREAD_CALLBACK}
+  _MINIDUMP_THREAD_CALLBACK = record
+    ThreadId: ULONG;
+    ThreadHandle: HANDLE;
+    Context: CONTEXT;
+    SizeOfContext: ULONG;
+    StackBase: ULONG64;
+    StackEnd: ULONG64;
+  end;
+  {$EXTERNALSYM _MINIDUMP_THREAD_CALLBACK}
+  MINIDUMP_THREAD_CALLBACK = _MINIDUMP_THREAD_CALLBACK;
+  {$EXTERNALSYM MINIDUMP_THREAD_CALLBACK}
+  TMinidumpThreadCallback = MINIDUMP_THREAD_CALLBACK;
+  PMinidumpThreadCallback = PMINIDUMP_THREAD_CALLBACK;
+
+  PMINIDUMP_THREAD_EX_CALLBACK = ^MINIDUMP_THREAD_EX_CALLBACK;
+  {$EXTERNALSYM PMINIDUMP_THREAD_EX_CALLBACK}
+  _MINIDUMP_THREAD_EX_CALLBACK = record
+    ThreadId: ULONG;
+    ThreadHandle: HANDLE;
+    Context: CONTEXT;
+    SizeOfContext: ULONG;
+    StackBase: ULONG64;
+    StackEnd: ULONG64;
+    BackingStoreBase: ULONG64;
+    BackingStoreEnd: ULONG64;
+  end;
+  {$EXTERNALSYM _MINIDUMP_THREAD_EX_CALLBACK}
+  MINIDUMP_THREAD_EX_CALLBACK = _MINIDUMP_THREAD_EX_CALLBACK;
+  {$EXTERNALSYM MINIDUMP_THREAD_EX_CALLBACK}
+  TMinidumpThreadExCallback = MINIDUMP_THREAD_EX_CALLBACK;
+  PMinidumpThreadExCallback = PMINIDUMP_THREAD_EX_CALLBACK;
+
+  PMINIDUMP_INCLUDE_THREAD_CALLBACK = ^MINIDUMP_INCLUDE_THREAD_CALLBACK;
+  {$EXTERNALSYM PMINIDUMP_INCLUDE_THREAD_CALLBACK}
+  _MINIDUMP_INCLUDE_THREAD_CALLBACK = record
+    ThreadId: ULONG;
+  end;
+  {$EXTERNALSYM _MINIDUMP_INCLUDE_THREAD_CALLBACK}
+  MINIDUMP_INCLUDE_THREAD_CALLBACK = _MINIDUMP_INCLUDE_THREAD_CALLBACK;
+  {$EXTERNALSYM MINIDUMP_INCLUDE_THREAD_CALLBACK}
+  TMinidumpIncludeThreadCallback = MINIDUMP_INCLUDE_THREAD_CALLBACK;
+  PMinidumpIncludeThreadCallback = PMINIDUMP_INCLUDE_THREAD_CALLBACK;
+
+  PMINIDUMP_MODULE_CALLBACK = ^MINIDUMP_MODULE_CALLBACK;
+  {$EXTERNALSYM PMINIDUMP_MODULE_CALLBACK}
+  _MINIDUMP_MODULE_CALLBACK = record
+    FullPath: PWCHAR;
+    BaseOfImage: ULONG64;
+    SizeOfImage: ULONG;
+    CheckSum: ULONG;
+    TimeDateStamp: ULONG;
+    VersionInfo: VS_FIXEDFILEINFO;
+    CvRecord: PVOID;
+    SizeOfCvRecord: ULONG;
+    MiscRecord: PVOID;
+    SizeOfMiscRecord: ULONG;
+  end;
+  {$EXTERNALSYM _MINIDUMP_MODULE_CALLBACK}
+  MINIDUMP_MODULE_CALLBACK = _MINIDUMP_MODULE_CALLBACK;
+  {$EXTERNALSYM MINIDUMP_MODULE_CALLBACK}
+  TMinidumpModuleCallback = MINIDUMP_MODULE_CALLBACK;
+  PMinidumpModuleCallback = PMINIDUMP_MODULE_CALLBACK;
+
+  PMINIDUMP_INCLUDE_MODULE_CALLBACK = ^MINIDUMP_INCLUDE_MODULE_CALLBACK;
+  {$EXTERNALSYM PMINIDUMP_INCLUDE_MODULE_CALLBACK}
+  _MINIDUMP_INCLUDE_MODULE_CALLBACK = record
+    BaseOfImage: ULONG64;
+  end;
+  {$EXTERNALSYM _MINIDUMP_INCLUDE_MODULE_CALLBACK}
+  MINIDUMP_INCLUDE_MODULE_CALLBACK = _MINIDUMP_INCLUDE_MODULE_CALLBACK;
+  {$EXTERNALSYM MINIDUMP_INCLUDE_MODULE_CALLBACK}
+  TMinidumpIncludeModuleCallback = MINIDUMP_INCLUDE_MODULE_CALLBACK;
+  PMinidumpIncludeModuleCallback = PMINIDUMP_INCLUDE_MODULE_CALLBACK;
+
+//
+// Support for arbitrary user-defined information.
+//
+
+  PMINIDUMP_USER_RECORD = ^MINIDUMP_USER_RECORD;
+  {$EXTERNALSYM PMINIDUMP_USER_RECORD}
+  _MINIDUMP_USER_RECORD = record
+    Type_: ULONG32;
+    Memory: MINIDUMP_LOCATION_DESCRIPTOR;
+  end;
+  {$EXTERNALSYM _MINIDUMP_USER_RECORD}
+  MINIDUMP_USER_RECORD = _MINIDUMP_USER_RECORD;
+  {$EXTERNALSYM MINIDUMP_USER_RECORD}
+  TMinidumpUserRecord = MINIDUMP_USER_RECORD;
+  PMinidumpUserRecord = PMINIDUMP_USER_RECORD;
+
+  PMINIDUMP_USER_STREAM = ^MINIDUMP_USER_STREAM;
+  {$EXTERNALSYM PMINIDUMP_USER_STREAM}
+  _MINIDUMP_USER_STREAM = record
+    Type_: ULONG32;
+    BufferSize: ULONG;
+    Buffer: PVOID;
+  end;
+  {$EXTERNALSYM _MINIDUMP_USER_STREAM}
+  MINIDUMP_USER_STREAM = _MINIDUMP_USER_STREAM;
+  {$EXTERNALSYM MINIDUMP_USER_STREAM}
+  TMinidumpUserStream = MINIDUMP_USER_STREAM;
+  PMinidumpUserStream = PMINIDUMP_USER_STREAM;
+
+  PMINIDUMP_USER_STREAM_INFORMATION = ^MINIDUMP_USER_STREAM_INFORMATION;
+  {$EXTERNALSYM PMINIDUMP_USER_STREAM_INFORMATION}
+  _MINIDUMP_USER_STREAM_INFORMATION = record
+    UserStreamCount: ULONG;
+    UserStreamArray: PMINIDUMP_USER_STREAM;
+  end;
+  {$EXTERNALSYM _MINIDUMP_USER_STREAM_INFORMATION}
+  MINIDUMP_USER_STREAM_INFORMATION = _MINIDUMP_USER_STREAM_INFORMATION;
+  {$EXTERNALSYM MINIDUMP_USER_STREAM_INFORMATION}
+  TMinidumpUserStreamInformation = MINIDUMP_USER_STREAM_INFORMATION;
+  PMinidumpUserStreamInformation = PMINIDUMP_USER_STREAM_INFORMATION;
+
+  _MODULE_WRITE_FLAGS = DWORD;
+  {$EXTERNALSYM _MODULE_WRITE_FLAGS}
+  MODULE_WRITE_FLAGS = _MODULE_WRITE_FLAGS;
+  {$EXTERNALSYM MODULE_WRITE_FLAGS}
+  TModuleWriteFlags = MODULE_WRITE_FLAGS;
+
+  _MINIDUMP_CALLBACK_INPUT = record
+    ProcessId: ULONG;
+    ProcessHandle: HANDLE;
+    CallbackType: ULONG;
+    case Integer of
+      0: (Thread: MINIDUMP_THREAD_CALLBACK);
+      1: (ThreadEx: MINIDUMP_THREAD_EX_CALLBACK);
+      2: (Module: MINIDUMP_MODULE_CALLBACK);
+      3: (IncludeThread: MINIDUMP_INCLUDE_THREAD_CALLBACK);
+      4: (IncludeModule: MINIDUMP_INCLUDE_MODULE_CALLBACK);
+  end;
+  {$EXTERNALSYM _MINIDUMP_CALLBACK_INPUT}
+  MINIDUMP_CALLBACK_INPUT = _MINIDUMP_CALLBACK_INPUT;
+  {$EXTERNALSYM MINIDUMP_CALLBACK_INPUT}
+  PMINIDUMP_CALLBACK_INPUT = ^MINIDUMP_CALLBACK_INPUT;
+  {$EXTERNALSYM PMINIDUMP_CALLBACK_INPUT}
+  TminidumpCallbackInput = MINIDUMP_CALLBACK_INPUT;
+
+  PMINIDUMP_CALLBACK_OUTPUT = ^MINIDUMP_CALLBACK_OUTPUT;
+  {$EXTERNALSYM PMINIDUMP_CALLBACK_OUTPUT}
+  _MINIDUMP_CALLBACK_OUTPUT = record
+    case Integer of
+      0: (ModuleWriteFlags: ULONG);
+      1: (ThreadWriteFlags: ULONG);
+  end;
+  {$EXTERNALSYM _MINIDUMP_CALLBACK_OUTPUT}
+  MINIDUMP_CALLBACK_OUTPUT = _MINIDUMP_CALLBACK_OUTPUT;
+  {$EXTERNALSYM MINIDUMP_CALLBACK_OUTPUT}
+  TMinidumpCallbackOutput = MINIDUMP_CALLBACK_OUTPUT;
+  PMinidumpCallbackOutput = PMINIDUMP_CALLBACK_OUTPUT;
+
+//
+// The minidump callback should modify the FieldsToWrite parameter to reflect
+// what portions of the specified thread or module should be written to the
+// file.
+//
+
+  MINIDUMP_CALLBACK_ROUTINE = function(CallbackParam: PVOID; CallbackInput: PMINIDUMP_CALLBACK_INPUT;
+    CallbackOutput: PMINIDUMP_CALLBACK_OUTPUT): BOOL; stdcall;
+  {$EXTERNALSYM MINIDUMP_CALLBACK_ROUTINE}
+  TMinidumpCallbackRoutine = MINIDUMP_CALLBACK_ROUTINE;
+
+  PMINIDUMP_CALLBACK_INFORMATION = ^MINIDUMP_CALLBACK_INFORMATION;
+  {$EXTERNALSYM PMINIDUMP_CALLBACK_INFORMATION}
+  _MINIDUMP_CALLBACK_INFORMATION = record
+    CallbackRoutine: MINIDUMP_CALLBACK_ROUTINE;
+    CallbackParam: PVOID;
+  end;
+  {$EXTERNALSYM _MINIDUMP_CALLBACK_INFORMATION}
+  MINIDUMP_CALLBACK_INFORMATION = _MINIDUMP_CALLBACK_INFORMATION;
+  {$EXTERNALSYM MINIDUMP_CALLBACK_INFORMATION}
+  TMinidumpCallbackInformation = MINIDUMP_CALLBACK_INFORMATION;
+  PMinidumpCallbackInformation = PMINIDUMP_CALLBACK_INFORMATION;
+
+//
+// The MINIDUMP_HEADER field StreamDirectoryRva points to
+// an array of MINIDUMP_DIRECTORY structures.
+//
+
+  PMINIDUMP_DIRECTORY = ^MINIDUMP_DIRECTORY;
+  {$EXTERNALSYM PMINIDUMP_DIRECTORY}
+  _MINIDUMP_DIRECTORY = record
+    StreamType: ULONG32;
+    Location: MINIDUMP_LOCATION_DESCRIPTOR;
+  end;
+  {$EXTERNALSYM _MINIDUMP_DIRECTORY}
+  MINIDUMP_DIRECTORY = _MINIDUMP_DIRECTORY;
+  {$EXTERNALSYM MINIDUMP_DIRECTORY}
+  TMinidumpDirectory = MINIDUMP_DIRECTORY;
+  PMinidumpDirectory = PMINIDUMP_DIRECTORY;
+
+  PMINIDUMP_STRING = ^MINIDUMP_STRING;
+  {$EXTERNALSYM PMINIDUMP_STRING}
+  _MINIDUMP_STRING = record
+    Length: ULONG32; // Length in bytes of the string
+    Buffer: PWCHAR; // Variable size buffer
+  end;
+  {$EXTERNALSYM _MINIDUMP_STRING}
+  MINIDUMP_STRING = _MINIDUMP_STRING;
+  {$EXTERNALSYM MINIDUMP_STRING}
+  TMinidumpString = MINIDUMP_STRING;
+  PMinidumpString = PMINIDUMP_STRING;
+
+function MiniDumpWriteDump(hProcess: THandle; ProcessId: DWORD; hFile: THandle; DumpType: MINIDUMP_TYPE; ExceptionParam: PMINIDUMP_EXCEPTION_INFORMATION; UserStreamParam: PMINIDUMP_USER_STREAM_INFORMATION; CallbackParam: PMINIDUMP_CALLBACK_INFORMATION): BOOL; stdcall;
+{$EXTERNALSYM MiniDumpWriteDump}
+
+function MiniDumpReadDumpStream(BaseOfDump: PVOID; StreamNumber: ULONG; var Dir: PMINIDUMP_DIRECTORY; var StreamPointer: PVOID; var StreamSize: ULONG): BOOL; stdcall;
+{$EXTERNALSYM MiniDumpReadDumpStream}
+
+function OpenThread(dwDesiredAccess: DWORD; bInheritHandle: BOOL; dwThreadId: DWORD): HANDLE; stdcall;
+{$EXTERNALSYM OpenThread}
+
+implementation
+
+const
+  DbgHlpLib = 'dbghelp.dll';
+
+function MiniDumpWriteDump; external DbgHlpLib name 'MiniDumpWriteDump';
+function MiniDumpReadDumpStream; external DbgHlpLib name 'MiniDumpReadDumpStream';
+function OpenThread; external kernel32 name 'OpenThread';
+
+end.

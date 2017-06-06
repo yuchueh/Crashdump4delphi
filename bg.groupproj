@@ -1,0 +1,48 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{F83990EF-CA58-41C8-978A-336602306EB1}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="bugreport.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="crashtest\crashtest.dproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="bugreport">
+        <MSBuild Projects="bugreport.dproj"/>
+    </Target>
+    <Target Name="bugreport:Clean">
+        <MSBuild Projects="bugreport.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="bugreport:Make">
+        <MSBuild Projects="bugreport.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="crashtest">
+        <MSBuild Projects="crashtest\crashtest.dproj"/>
+    </Target>
+    <Target Name="crashtest:Clean">
+        <MSBuild Projects="crashtest\crashtest.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="crashtest:Make">
+        <MSBuild Projects="crashtest\crashtest.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="bugreport;crashtest"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="bugreport:Clean;crashtest:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="bugreport:Make;crashtest:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>
